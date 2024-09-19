@@ -81,12 +81,29 @@ class Main7 extends AggregateProgramSkeleton:
 object Demo7 extends Simulation[Main7]
 
 class Main8 extends AggregateProgramSkeleton:
-  override def main() = minHoodPlus(nbrRange)
+  override def main() =
+    val closestNeighbour: (Double, ID) = minHoodPlus { (nbrRange(), nbr(mid())) }
+    closestNeighbour._2
 
 object Demo8 extends Simulation[Main8]
 
 class Main9 extends AggregateProgramSkeleton:
-  override def main() = rep(0){_+1}
+  override def main() = rep(0) { count =>
+    mux(sense1) {
+      if (count >= 1000) 1000 else count + 1
+    } {
+      0
+    }
+    /* same behaviour with branch "if".
+    { count =>
+        if (sense1) {
+          if (count >= 1000) 1000 else count + 1
+        } else {
+          0
+        }
+    }
+    */
+  }
 
 object Demo9 extends Simulation[Main9]
 
@@ -103,7 +120,7 @@ object Demo11 extends Simulation[Main11]
 class Main12 extends AggregateProgramSkeleton:
   import Builtins.Bounded.of_i
 
-  override def main() = maxHoodPlus(boolToInt(nbr{sense1}))
+  override def main() = foldhood(Set.empty[ID])(_ ++ _){ Set(nbr(mid())) }
 
 object Demo12 extends Simulation[Main12]
 
@@ -115,7 +132,14 @@ object Demo13 extends Simulation[Main13]
 class Main14 extends AggregateProgramSkeleton:
   import Builtins.Bounded.of_i
 
-  override def main() = rep(0){ x => boolToInt(sense1) max maxHoodPlus( nbr{x}) }
+  override def main() =
+    rep(mid()) { currentMax =>
+      maxHoodPlus {
+        nbr {
+          currentMax
+        } max mid()
+      }
+    }
 
 object Demo14 extends Simulation[Main14]
 
@@ -126,8 +150,18 @@ class Main15 extends AggregateProgramSkeleton:
 object Demo15 extends Simulation[Main15]
 
 class Main16 extends AggregateProgramSkeleton:
-  override def main() = rep(Double.MaxValue):
-    d => mux[Double](sense1){0.0}{minHoodPlus(nbr{d}+nbrRange)}
+  override def main() =
+    rep(Double.PositiveInfinity) { distance =>
+      mux(sense1) {
+        0.0
+      } {
+        // Accumulate the modified distances
+        minHoodPlus {
+          val adjustedRange = nbrRange() * (if (nbr { sense2 }) 5 else 1)
+          nbr { distance } + adjustedRange
+        }
+      }
+    }
 
 object Demo16 extends Simulation[Main16]
 
