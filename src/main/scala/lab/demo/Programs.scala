@@ -25,6 +25,7 @@ trait Simulation[R: ClassTag] extends App:
     case i: java.lang.Number if (i.doubleValue()>100000) => "Inf"
     case i: java.lang.Number if (-i.doubleValue()>100000) => "-Inf"
     case i: java.lang.Double => f"${i.doubleValue()}%1.2f"
+
     case x => x.toString
 
   val nodes = 100
@@ -164,6 +165,60 @@ class Main16 extends AggregateProgramSkeleton:
     }
 
 object Demo16 extends Simulation[Main16]
+
+// new block: partition
+class Main16WithPartition extends AggregateProgramSkeleton:
+  import Builtins.Bounded.of_i
+
+  def partition(): (Double, ID) =
+    // Propaghiamo la coppia (distanza, sourceId) come prima
+    val nodePair = rep((Double.PositiveInfinity, mid())) { case (dist, srcId) =>
+      mux(sense1) {
+        (0.0, mid())
+      } {
+        minHoodPlus {
+          val adjustedRange = nbrRange() * (if (nbr { sense2 }) 5 else 1)
+          (nbr { dist } + adjustedRange, nbr { srcId })
+        }
+      }
+    }
+    // Proiettiamo sulla seconda componente, cioè l'ID della sorgente, per ottenere la partizione
+    nodePair
+
+  override def main() =
+    partition()
+
+object Demo16WithPartition extends Simulation[Main16WithPartition]
+
+// new block: do Channel
+class Main16DoChannel extends AggregateProgramSkeleton with BlockG with BlockT with BlockC:
+  import Builtins.Bounded.of_i
+
+  // Broadcast function to propagate data across the network
+  def broadcast[A](source: Boolean)(initial: A)(accumulate: (A, A) => A): A =
+    rep(initial) { current =>
+      mux(source) {
+        initial
+      } {
+        foldhoodPlus(initial)(accumulate)(nbr(current))
+      }
+    }
+
+  override def main() =
+    // Define the gradient with the source
+    val gradient = gradientCast(source = sense1)(center = 0.0)(_ + nbrRange)
+
+    // Use broadcast to propagate the gradient values
+    val broadcasted = broadcast(source = sense1)(gradient)((a, b) => a + b)
+
+    // Calculate block distance based on the broadcast result
+    val blockDistance = foldhoodPlus(Double.PositiveInfinity)(_ min _){nbr(broadcasted)}
+
+    // Return the block distance
+    blockDistance
+
+object Demo16DoChannel extends Simulation[Main16DoChannel]
+
 
 class Main17 extends AggregateProgramSkeleton with BlockG:
   override def main() = gradientCast(source = sense1)(center = false)(accumulation = sense2 | _)
